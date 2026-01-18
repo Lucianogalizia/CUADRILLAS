@@ -9,9 +9,10 @@ class CreateEvent(BaseModel):
     cuadrilla: str
     id_cuadrilla: Optional[str] = None
     event_type: EventType
-    event_time: Optional[str] = None  # ISO; si no viene usamos server time
+    event_time: Optional[str] = None
     lat: float
     lon: float
     accuracy_m: Optional[float] = None
     pause_reason: Optional[str] = None
     comment: Optional[str] = None
+
