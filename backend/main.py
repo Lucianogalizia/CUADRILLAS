@@ -11,7 +11,7 @@ import local_db as bq   # <-- base de datos LOCAL
 
 app = FastAPI(title="Seguimiento de Cuadrillas - Modo Local")
 
-FRONT_DIST = "frontend/dist"
+FRONT_DIST = "/app/frontend/dist"
 try:
     app.mount("/", StaticFiles(directory=FRONT_DIST, html=True), name="frontend")
 except:
