@@ -19,6 +19,8 @@ COPY --from=fe /app/frontend/dist /app/frontend/dist
 ENV FRONT_DIST=/app/frontend/dist
 ENV PORT=8080
 
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8080"]
+WORKDIR /app/backend
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+
 
 
