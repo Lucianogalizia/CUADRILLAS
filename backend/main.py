@@ -6,12 +6,13 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.staticfiles import StaticFiles
 import pandas as pd
 
-from backend.models import CreateEvent
-import backend.local_db as bq
+from models import CreateEvent
+import local_db as bq
 
 app = FastAPI(title="Seguimiento de Cuadrillas - Modo Local")
 
-FRONT_DIST = "/app/frontend/dist"
+import os
+FRONT_DIST = os.environ.get("FRONT_DIST", "/app/frontend/dist")
 try:
     app.mount("/", StaticFiles(directory=FRONT_DIST, html=True), name="frontend")
 except:
