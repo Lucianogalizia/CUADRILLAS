@@ -4,20 +4,29 @@ import { useNavigate } from "react-router-dom";
 
 export default function Tasks() {
   const nav = useNavigate();
-  const cuadrilla = localStorage.getItem("cuadrilla") || "";
   const [rows, setRows] = useState<any[]>([]);
   const [err, setErr] = useState<string>("");
 
+  const cuadrilla = (localStorage.getItem("cuadrilla") || "").trim();
+
   useEffect(() => {
+    // ✅ Si no hay cuadrilla elegida, volvemos al inicio
+    if (!cuadrilla) {
+      nav("/", { replace: true });
+      return;
+    }
+
     (async () => {
       try {
+        setErr("");
         const out = await listTasks(cuadrilla);
         setRows(out.tasks || []);
-      } catch (e:any) {
+      } catch (e: any) {
         setErr(e.message);
+        setRows([]);
       }
     })();
-  }, []);
+  }, [cuadrilla, nav]);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 p-4">
@@ -26,7 +35,11 @@ export default function Tasks() {
           <h2 className="text-2xl font-semibold">Tareas – {cuadrilla}</h2>
           <p className="text-zinc-300 mt-1">Elegí una fila (OP) para operar.</p>
 
-          {err && <div className="mt-4 p-3 rounded-xl bg-zinc-950 border border-red-900 text-red-200">{err}</div>}
+          {err && (
+            <div className="mt-4 p-3 rounded-xl bg-zinc-950 border border-red-900 text-red-200">
+              {err}
+            </div>
+          )}
 
           <div className="mt-5 grid gap-3">
             {rows.map((t) => (
@@ -40,11 +53,16 @@ export default function Tasks() {
                   <div className="text-xs text-zinc-400">{t.source_file}</div>
                 </div>
                 <div className="text-zinc-300 mt-1">{t.desc_op}</div>
-                <div className="text-zinc-400 text-sm mt-1">UT: {t.ut} • Contratista: {t.contratista}</div>
+                <div className="text-zinc-400 text-sm mt-1">
+                  UT: {t.ut} • Contratista: {t.contratista}
+                </div>
               </button>
             ))}
+
             {rows.length === 0 && (
-              <div className="text-zinc-400">No hay tareas para esta cuadrilla (o no se importó Excel).</div>
+              <div className="text-zinc-400">
+                No hay tareas para esta cuadrilla (o no se importó Excel).
+              </div>
             )}
           </div>
         </div>
