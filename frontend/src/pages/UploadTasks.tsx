@@ -14,9 +14,12 @@ export default function UploadTasks() {
       const out = await uploadExcels(files);
       setMsg(`✅ Importación OK. Filas procesadas: ${out.imported}`);
 
-      // ✅ Volver automático (dejá 1.2s para que el usuario vea el OK)
       setTimeout(() => {
-        navigate("/tasks"); // <- si querés ir al dashboard: "/dashboard" | si querés login: "/"
+        // ✅ limpiar la cuadrilla vieja para que no "salte solo"
+        localStorage.removeItem("cuadrilla");
+
+        // ✅ volver a pantalla inicial para que el usuario elija
+        navigate("/", { replace: true });
       }, 1200);
 
     } catch (e: any) {
