@@ -1,3 +1,5 @@
+# backend/main.py
+
 import os
 import uuid
 import hashlib
@@ -11,13 +13,7 @@ from backend.models import CreateEvent
 import backend.local_db as bq
 
 
-app = FastAPI(title="Seguimiento de Cuadrillas - Modo Local")
-
-FRONT_DIST = os.environ.get("FRONT_DIST", "/app/frontend/dist")
-try:
-    app.mount("/", StaticFiles(directory=FRONT_DIST, html=True), name="frontend")
-except Exception:
-    pass
+app = FastAPI(title="Seguimiento de CuADRILLAS - Modo Local")
 
 
 def now_utc():
@@ -226,3 +222,15 @@ async def create_event(payload: CreateEvent):
 @app.get("/api/dashboard")
 def dashboard():
     return {"rows": bq.dashboard_latest()}
+
+
+# ==========================================================
+# IMPORTANTE:
+# Montar el frontend AL FINAL para no "pisar" /api/*
+# (si lo montás al principio, StaticFiles agarra /api/... y te da 405)
+# ==========================================================
+FRONT_DIST = os.environ.get("FRONT_DIST", "/app/frontend/dist")
+try:
+    app.mount("/", StaticFiles(directory=FRONT_DIST, html=True), name="frontend")
+except Exception:
+    pass
