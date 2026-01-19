@@ -7,11 +7,12 @@ RUN npm run build
 
 FROM python:3.12-slim AS be
 WORKDIR /app
+
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-
-# clave:
 ENV PYTHONPATH=/app
+ENV PORT=8080
+ENV FRONT_DIST=/app/frontend/dist
 
 COPY backend/requirements.txt /app/backend/requirements.txt
 RUN pip install --no-cache-dir -r /app/backend/requirements.txt
@@ -19,7 +20,5 @@ RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 COPY backend/ /app/backend/
 COPY --from=fe /app/frontend/dist /app/frontend/dist
 
-ENV FRONT_DIST=/app/frontend/dist
-ENV PORT=8080
+CMD ["bash", "-lc", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT}"]
 
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8080"]
