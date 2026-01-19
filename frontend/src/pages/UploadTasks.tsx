@@ -1,7 +1,10 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { uploadExcels } from "../api";
 
 export default function UploadTasks() {
+  const navigate = useNavigate();
+
   const [files, setFiles] = useState<File[]>([]);
   const [msg, setMsg] = useState<string>("");
 
@@ -10,7 +13,13 @@ export default function UploadTasks() {
     try {
       const out = await uploadExcels(files);
       setMsg(`✅ Importación OK. Filas procesadas: ${out.imported}`);
-    } catch (e:any) {
+
+      // ✅ Volver automático (dejá 1.2s para que el usuario vea el OK)
+      setTimeout(() => {
+        navigate("/tasks"); // <- si querés ir al dashboard: "/dashboard" | si querés login: "/"
+      }, 1200);
+
+    } catch (e: any) {
       setMsg(`❌ Error: ${e.message}`);
     }
   }
@@ -19,7 +28,9 @@ export default function UploadTasks() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100 p-4">
       <div className="max-w-2xl mx-auto bg-zinc-900/60 border border-zinc-800 rounded-2xl p-6">
         <h2 className="text-2xl font-semibold">Subir Excel de Trabajos</h2>
-        <p className="text-zinc-300 mt-2">Podés subir <b>más de un Excel</b>.</p>
+        <p className="text-zinc-300 mt-2">
+          Podés subir <b>más de un Excel</b>.
+        </p>
 
         <input
           className="mt-5 block w-full text-zinc-200"
@@ -37,7 +48,11 @@ export default function UploadTasks() {
           Importar
         </button>
 
-        {msg && <div className="mt-4 p-3 rounded-xl bg-zinc-950 border border-zinc-800">{msg}</div>}
+        {msg && (
+          <div className="mt-4 p-3 rounded-xl bg-zinc-950 border border-zinc-800">
+            {msg}
+          </div>
+        )}
 
         <div className="mt-6 text-sm text-zinc-400">
           Columnas requeridas: Contratista, OT, UT, Descripción OT, Descripción OP, Cuadrilla, ID Cuadrilla
