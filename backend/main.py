@@ -6,8 +6,8 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.staticfiles import StaticFiles
 import pandas as pd
 
-from models import CreateEvent
-import local_db as bq
+from backend.models import CreateEvent
+import backend.local_db as bq
 
 app = FastAPI(title="Seguimiento de Cuadrillas - Modo Local")
 
