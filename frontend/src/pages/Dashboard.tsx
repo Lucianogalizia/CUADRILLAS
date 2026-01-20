@@ -15,6 +15,23 @@ function mapsLink(r: any) {
   return `https://www.google.com/maps?q=${r.lat},${r.lon}`;
 }
 
+// ✅ Mostrar hora en Argentina (Rio Gallegos -03)
+function fmtAr(iso: string) {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return String(iso);
+
+  return d.toLocaleString("es-AR", {
+    timeZone: "America/Argentina/Rio_Gallegos",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
 export default function Dashboard() {
   const [rows, setRows] = useState<any[]>([]);
   const [err, setErr] = useState("");
@@ -45,7 +62,11 @@ export default function Dashboard() {
           <div className="text-xs text-zinc-400">Actualiza cada 15s</div>
         </div>
 
-        {err && <div className="mt-4 p-3 rounded-2xl bg-zinc-950 border border-red-900 text-red-200">{err}</div>}
+        {err && (
+          <div className="mt-4 p-3 rounded-2xl bg-zinc-950 border border-red-900 text-red-200">
+            {err}
+          </div>
+        )}
 
         <div className="mt-5 overflow-auto rounded-2xl border border-zinc-800">
           <table className="w-full text-sm">
@@ -69,26 +90,38 @@ export default function Dashboard() {
                     <td className="p-3 font-semibold">{r.cuadrilla}</td>
                     <td className="p-3">{r.id_cuadrilla || "-"}</td>
                     <td className="p-3">{r.ot}</td>
-                    <td className="p-3"><span className={badge(r.event_type)}>{r.event_type}</span></td>
-                    <td className="p-3 text-zinc-300">{String(r.event_time || "").replace("T"," ").replace("Z","")}</td>
+                    <td className="p-3">
+                      <span className={badge(r.event_type)}>{r.event_type}</span>
+                    </td>
+                    <td className="p-3 text-zinc-300">{fmtAr(r.event_time)}</td>
                     <td className="p-3 text-zinc-300">{r.pause_reason || "-"}</td>
                     <td className="p-3 text-zinc-300">
                       {link ? (
                         <a className="text-brandRed underline" href={link} target="_blank" rel="noreferrer">
                           ver mapa {r.accuracy_m != null ? `(${Math.round(r.accuracy_m)}m)` : ""}
                         </a>
-                      ) : "-"}
+                      ) : (
+                        "-"
+                      )}
                     </td>
                     <td className="p-3">
                       {r.photo_url ? (
-                        <a className="text-brandRed underline" href={r.photo_url} target="_blank" rel="noreferrer">ver</a>
-                      ) : "-"}
+                        <a className="text-brandRed underline" href={r.photo_url} target="_blank" rel="noreferrer">
+                          ver
+                        </a>
+                      ) : (
+                        "-"
+                      )}
                     </td>
                   </tr>
                 );
               })}
               {rows.length === 0 && (
-                <tr><td className="p-4 text-zinc-400" colSpan={8}>Sin eventos todavía.</td></tr>
+                <tr>
+                  <td className="p-4 text-zinc-400" colSpan={8}>
+                    Sin eventos todavía.
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
