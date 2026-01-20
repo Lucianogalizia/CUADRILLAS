@@ -3,6 +3,8 @@ import { useParams } from "react-router-dom";
 import { getTask, sendEvent, sendEventWithPhoto } from "../api";
 import { getGeo } from "../util";
 
+type LastGeo = { lat: number; lon: number; acc?: number | null; time: string; type: string };
+
 export default function TaskDetail() {
   const { taskId } = useParams();
   const cuadrilla = localStorage.getItem("cuadrilla") || "";
@@ -10,19 +12,31 @@ export default function TaskDetail() {
   const [msg, setMsg] = useState<string>("");
   const [pauseReason, setPauseReason] = useState<string>("Espera repuesto");
   const [comment, setComment] = useState<string>("");
-  const [photo, setPhoto] = useState<File|null>(null);
+  const [photo, setPhoto] = useState<File | null>(null);
+
+  // ✅ para mostrar en pantalla la última ubicación registrada desde acá
+  const [lastGeo, setLastGeo] = useState<LastGeo | null>(null);
 
   useEffect(() => {
     (async () => {
       const t = await getTask(String(taskId));
       setTask(t);
     })();
-  }, []);
+  }, [taskId]);
 
   async function fire(type: string) {
     setMsg("⏳ Tomando ubicación...");
     try {
       const geo = await getGeo();
+
+      // guardo para mostrarla
+      setLastGeo({
+        lat: geo.lat,
+        lon: geo.lon,
+        acc: geo.acc,
+        time: new Date().toISOString(),
+        type
+      });
 
       // si hay foto, usamos endpoint multipart
       if (photo) {
@@ -56,7 +70,7 @@ export default function TaskDetail() {
         });
         setMsg(`✅ ${type} registrado`);
       }
-    } catch (e:any) {
+    } catch (e: any) {
       setMsg(`❌ ${e.message}`);
     }
   }
@@ -65,13 +79,51 @@ export default function TaskDetail() {
 
   const bigBtn = "w-full py-5 rounded-2xl font-bold text-xl shadow-lg";
 
+  const mapsUrl =
+    lastGeo ? `https://www.google.com/maps?q=${lastGeo.lat},${lastGeo.lon}` : "";
+
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 p-4">
       <div className="max-w-2xl mx-auto bg-zinc-900/60 border border-zinc-800 rounded-2xl p-6">
-        <div className="text-sm text-zinc-400">Cuadrilla: {cuadrilla} • ID: {task.id_cuadrilla}</div>
+        <div className="text-sm text-zinc-400">
+          Cuadrilla: {cuadrilla} • ID: {task.id_cuadrilla}
+        </div>
         <div className="text-2xl font-semibold mt-1">OT {task.ot}</div>
         <div className="text-zinc-300 mt-2">{task.desc_op}</div>
-        <div className="text-zinc-400 text-sm mt-2">UT: {task.ut} • Contratista: {task.contratista}</div>
+        <div className="text-zinc-400 text-sm mt-2">
+          UT: {task.ut} • Contratista: {task.contratista}
+        </div>
+
+        {/* ✅ Mostrar coordenadas registradas */}
+        <div className="mt-4 p-4 rounded-2xl bg-zinc-950 border border-zinc-800">
+          <div className="font-semibold">📌 Última ubicación registrada</div>
+          {lastGeo ? (
+            <div className="mt-2 text-sm text-zinc-300 space-y-1">
+              <div>
+                Evento: <span className="font-semibold">{lastGeo.type}</span>
+              </div>
+              <div>
+                Lat/Lon:{" "}
+                <span className="font-mono">
+                  {lastGeo.lat.toFixed(6)}, {lastGeo.lon.toFixed(6)}
+                </span>
+              </div>
+              <div>
+                Precisión:{" "}
+                {lastGeo.acc != null ? `${Math.round(lastGeo.acc)} m` : "-"}
+              </div>
+              <div className="pt-1">
+                <a className="text-brandRed underline" href={mapsUrl} target="_blank" rel="noreferrer">
+                  Ver en Google Maps
+                </a>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-2 text-sm text-zinc-400">
+              Todavía no registraste un evento con ubicación en esta pantalla.
+            </div>
+          )}
+        </div>
 
         <div className="mt-5 grid gap-3">
           <button className={`${bigBtn} bg-zinc-800 hover:bg-zinc-700`} onClick={() => fire("LLEGADA")}>
