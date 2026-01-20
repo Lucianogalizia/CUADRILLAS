@@ -6,7 +6,13 @@ function badge(type: string) {
   if (type === "INICIO") return `${base} bg-green-600/20 text-green-200 border border-green-700/40`;
   if (type === "PAUSA") return `${base} bg-yellow-600/20 text-yellow-200 border border-yellow-700/40`;
   if (type === "FIN") return `${base} bg-blue-600/20 text-blue-200 border border-blue-700/40`;
+  if (type === "LLEGADA") return `${base} bg-purple-600/20 text-purple-200 border border-purple-700/40`;
   return `${base} bg-zinc-800 text-zinc-200 border border-zinc-700`;
+}
+
+function mapsLink(r: any) {
+  if (r?.lat == null || r?.lon == null) return null;
+  return `https://www.google.com/maps?q=${r.lat},${r.lon}`;
 }
 
 export default function Dashboard() {
@@ -19,7 +25,7 @@ export default function Dashboard() {
         const out = await getDashboard();
         setRows(out.rows || []);
         setErr("");
-      } catch (e:any) {
+      } catch (e: any) {
         setErr(e.message);
       }
     };
@@ -51,27 +57,38 @@ export default function Dashboard() {
                 <th className="p-3">Estado</th>
                 <th className="p-3">Hora</th>
                 <th className="p-3">Motivo</th>
+                <th className="p-3">Ubicación</th>
                 <th className="p-3">Foto</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, i) => (
-                <tr key={i} className="border-t border-zinc-800 hover:bg-zinc-950/40">
-                  <td className="p-3 font-semibold">{r.cuadrilla}</td>
-                  <td className="p-3">{r.id_cuadrilla || "-"}</td>
-                  <td className="p-3">{r.ot}</td>
-                  <td className="p-3"><span className={badge(r.event_type)}>{r.event_type}</span></td>
-                  <td className="p-3 text-zinc-300">{String(r.event_time || "").replace("T"," ").replace("Z","")}</td>
-                  <td className="p-3 text-zinc-300">{r.pause_reason || "-"}</td>
-                  <td className="p-3">
-                    {r.photo_url ? (
-                      <a className="text-brandRed underline" href={r.photo_url} target="_blank">ver</a>
-                    ) : "-"}
-                  </td>
-                </tr>
-              ))}
+              {rows.map((r, i) => {
+                const link = mapsLink(r);
+                return (
+                  <tr key={i} className="border-t border-zinc-800 hover:bg-zinc-950/40">
+                    <td className="p-3 font-semibold">{r.cuadrilla}</td>
+                    <td className="p-3">{r.id_cuadrilla || "-"}</td>
+                    <td className="p-3">{r.ot}</td>
+                    <td className="p-3"><span className={badge(r.event_type)}>{r.event_type}</span></td>
+                    <td className="p-3 text-zinc-300">{String(r.event_time || "").replace("T"," ").replace("Z","")}</td>
+                    <td className="p-3 text-zinc-300">{r.pause_reason || "-"}</td>
+                    <td className="p-3 text-zinc-300">
+                      {link ? (
+                        <a className="text-brandRed underline" href={link} target="_blank" rel="noreferrer">
+                          ver mapa {r.accuracy_m != null ? `(${Math.round(r.accuracy_m)}m)` : ""}
+                        </a>
+                      ) : "-"}
+                    </td>
+                    <td className="p-3">
+                      {r.photo_url ? (
+                        <a className="text-brandRed underline" href={r.photo_url} target="_blank" rel="noreferrer">ver</a>
+                      ) : "-"}
+                    </td>
+                  </tr>
+                );
+              })}
               {rows.length === 0 && (
-                <tr><td className="p-4 text-zinc-400" colSpan={7}>Sin eventos todavía.</td></tr>
+                <tr><td className="p-4 text-zinc-400" colSpan={8}>Sin eventos todavía.</td></tr>
               )}
             </tbody>
           </table>
