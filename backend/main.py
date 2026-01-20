@@ -1,5 +1,3 @@
-# backend/main.py
-
 import os
 import uuid
 import hashlib
@@ -11,7 +9,6 @@ import pandas as pd
 
 from backend.models import CreateEvent
 import backend.local_db as bq
-
 
 app = FastAPI(title="Seguimiento de CuADRILLAS - Modo Local")
 
@@ -116,7 +113,6 @@ async def upload_tasks(files: list[UploadFile] = File(...)):
 
             out = out.fillna("").astype(str)
 
-            # Filas válidas: con algo en OT/Cuadrilla/ID
             mask_any = (
                 (out["OT"].str.strip().str.len() > 0)
                 | (out["Cuadrilla"].str.strip().str.len() > 0)
@@ -188,6 +184,12 @@ def task(task_id: str):
     if not t:
         raise HTTPException(404, "No existe task")
     return t
+
+
+# ✅ NUEVO: historial de eventos por tarea
+@app.get("/api/task/{task_id}/events")
+def task_events(task_id: str):
+    return {"events": bq.list_events_by_task(task_id)}
 
 
 @app.post("/api/event")
