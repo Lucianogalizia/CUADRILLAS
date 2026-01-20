@@ -9,15 +9,18 @@ UPLOADS = os.path.join(BASE, "uploads")
 os.makedirs(BASE, exist_ok=True)
 os.makedirs(UPLOADS, exist_ok=True)
 
+
 def _load(path):
     if not os.path.exists(path):
         return []
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
+
 def _save(path, data):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
 
 def upsert_tasks(rows):
     tasks = _load(TASKS)
@@ -29,22 +32,30 @@ def upsert_tasks(rows):
     _save(TASKS, tasks)
     return len(rows)
 
+
 def insert_event(row):
     events = _load(EVENTS)
     events.append(row)
     _save(EVENTS, events)
     return True
 
+
 def list_tasks_by_cuadrilla(cuadrilla):
     tasks = _load(TASKS)
-    return [t for t in tasks if str(t.get("cuadrilla", "")).strip() == str(cuadrilla).strip()]
+    return [
+        t
+        for t in tasks
+        if str(t.get("cuadrilla", "")).strip() == str(cuadrilla).strip()
+    ]
+
 
 def get_task(task_id):
     tasks = _load(TASKS)
     for t in tasks:
-        if t["task_id"] == task_id:
+        if t.get("task_id") == task_id:
             return t
     return None
+
 
 def dashboard_latest():
     events = _load(EVENTS)
@@ -62,3 +73,11 @@ def dashboard_latest():
                 latest[k] = e
 
     return list(latest.values())
+
+
+# ✅ NUEVO: historial de eventos por task_id (ordenado por event_time)
+def list_events_by_task(task_id: str):
+    events = _load(EVENTS)
+    ev = [e for e in events if e.get("task_id") == task_id]
+    ev.sort(key=lambda x: x.get("event_time", ""))
+    return ev
