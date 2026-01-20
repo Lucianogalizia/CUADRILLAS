@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getDashboard } from "../api";
 
 function badge(type: string) {
@@ -15,7 +16,6 @@ function mapsLink(r: any) {
   return `https://www.google.com/maps?q=${r.lat},${r.lon}`;
 }
 
-// ✅ Mostrar hora en Argentina (Rio Gallegos -03)
 function fmtAr(iso: string) {
   if (!iso) return "-";
   const d = new Date(iso);
@@ -33,6 +33,7 @@ function fmtAr(iso: string) {
 }
 
 export default function Dashboard() {
+  const nav = useNavigate();
   const [rows, setRows] = useState<any[]>([]);
   const [err, setErr] = useState("");
 
@@ -86,7 +87,12 @@ export default function Dashboard() {
               {rows.map((r, i) => {
                 const link = mapsLink(r);
                 return (
-                  <tr key={i} className="border-t border-zinc-800 hover:bg-zinc-950/40">
+                  <tr
+                    key={i}
+                    className="border-t border-zinc-800 hover:bg-zinc-950/40 cursor-pointer"
+                    onClick={() => r.task_id && nav(`/task/${r.task_id}`)}
+                    title="Click para ver historial"
+                  >
                     <td className="p-3 font-semibold">{r.cuadrilla}</td>
                     <td className="p-3">{r.id_cuadrilla || "-"}</td>
                     <td className="p-3">{r.ot}</td>
@@ -95,7 +101,7 @@ export default function Dashboard() {
                     </td>
                     <td className="p-3 text-zinc-300">{fmtAr(r.event_time)}</td>
                     <td className="p-3 text-zinc-300">{r.pause_reason || "-"}</td>
-                    <td className="p-3 text-zinc-300">
+                    <td className="p-3 text-zinc-300" onClick={(e) => e.stopPropagation()}>
                       {link ? (
                         <a className="text-brandRed underline" href={link} target="_blank" rel="noreferrer">
                           ver mapa {r.accuracy_m != null ? `(${Math.round(r.accuracy_m)}m)` : ""}
@@ -104,7 +110,7 @@ export default function Dashboard() {
                         "-"
                       )}
                     </td>
-                    <td className="p-3">
+                    <td className="p-3" onClick={(e) => e.stopPropagation()}>
                       {r.photo_url ? (
                         <a className="text-brandRed underline" href={r.photo_url} target="_blank" rel="noreferrer">
                           ver
@@ -125,6 +131,10 @@ export default function Dashboard() {
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="mt-3 text-xs text-zinc-500">
+          Tip: hacé click en una fila para ver el historial completo de la tarea.
         </div>
       </div>
     </div>
