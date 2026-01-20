@@ -4,8 +4,10 @@ import os
 BASE = "local_data"
 TASKS = os.path.join(BASE, "tasks.json")
 EVENTS = os.path.join(BASE, "events.json")
+UPLOADS = os.path.join(BASE, "uploads")
 
 os.makedirs(BASE, exist_ok=True)
+os.makedirs(UPLOADS, exist_ok=True)
 
 def _load(path):
     if not os.path.exists(path):
@@ -35,7 +37,7 @@ def insert_event(row):
 
 def list_tasks_by_cuadrilla(cuadrilla):
     tasks = _load(TASKS)
-    return [t for t in tasks if t["cuadrilla"] == cuadrilla]
+    return [t for t in tasks if str(t.get("cuadrilla", "")).strip() == str(cuadrilla).strip()]
 
 def get_task(task_id):
     tasks = _load(TASKS)
@@ -56,7 +58,7 @@ def dashboard_latest():
         if k not in latest:
             latest[k] = e
         else:
-            if e["event_time"] > latest[k]["event_time"]:
+            if e.get("event_time", "") > latest[k].get("event_time", ""):
                 latest[k] = e
 
     return list(latest.values())
