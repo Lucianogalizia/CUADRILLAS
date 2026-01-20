@@ -20,7 +20,6 @@ export async function getTask(taskId: string) {
   return res.json();
 }
 
-// ✅ NUEVO: historial de eventos por tarea
 export async function getTaskEvents(taskId: string) {
   const res = await fetch(`${API}/task/${encodeURIComponent(taskId)}/events`);
   if (!res.ok) throw new Error(await res.text());
