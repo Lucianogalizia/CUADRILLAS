@@ -31,6 +31,24 @@ function fmtAr(iso: string) {
   });
 }
 
+// ✅ Duración entre estados (prev -> curr)
+function diffLabel(prevIso?: string, currIso?: string) {
+  if (!prevIso || !currIso) return "";
+  const a = new Date(prevIso).getTime();
+  const b = new Date(currIso).getTime();
+  if (!isFinite(a) || !isFinite(b)) return "";
+  const ms = b - a;
+  if (ms <= 0) return "";
+
+  const totalMin = Math.round(ms / 60000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+
+  if (h <= 0) return `+${m}m`;
+  if (m === 0) return `+${h}h`;
+  return `+${h}h ${String(m).padStart(2, "0")}m`;
+}
+
 export default function Dashboard() {
   const [rows, setRows] = useState<any[]>([]);
   const [err, setErr] = useState("");
@@ -72,9 +90,13 @@ export default function Dashboard() {
     setLoadingTaskId(taskId);
     try {
       const out = await getTaskEvents(taskId);
-      setEventsByTask((prev) => ({ ...prev, [taskId]: out.events || [] }));
+      const evs = (out.events || []).slice();
+
+      // por las dudas, ordeno por event_time asc
+      evs.sort((a: any, b: any) => String(a?.event_time || "").localeCompare(String(b?.event_time || "")));
+
+      setEventsByTask((prev) => ({ ...prev, [taskId]: evs }));
     } catch (e: any) {
-      // guardo array vacío pero con “error” visible
       setEventsByTask((prev) => ({ ...prev, [taskId]: [{ __error: e.message }] }));
     } finally {
       setLoadingTaskId(null);
@@ -118,7 +140,6 @@ export default function Dashboard() {
                 const taskId = String(r.task_id || "");
                 const isOpen = openTaskId === taskId;
                 const rowLink = mapsLink(r.lat, r.lon);
-
                 const evs = taskId ? eventsByTask[taskId] : null;
 
                 return (
@@ -165,26 +186,36 @@ export default function Dashboard() {
                     {isOpen && (
                       <tr key={`open-${i}`} className="border-t border-zinc-800 bg-zinc-950/30">
                         <td colSpan={8} className="p-4">
-                          <div className="text-sm font-semibold mb-2">Historial</div>
+                          <div className="text-sm font-semibold mb-2">Historial (con duración entre estados)</div>
 
                           {loadingTaskId === taskId && (
                             <div className="text-zinc-400 text-sm">Cargando historial…</div>
                           )}
 
-                          {!loadingTaskId && evs && evs.length === 1 && evs[0]?.__error && (
+                          {!loadingTaskId && evs && evs.length === 1 && (evs[0] as any)?.__error && (
                             <div className="text-red-200 text-sm">
-                              ❌ Error cargando historial: {evs[0].__error}
+                              ❌ Error cargando historial: {(evs[0] as any).__error}
                             </div>
                           )}
 
-                          {!loadingTaskId && evs && evs.length > 0 && !evs[0]?.__error && (
+                          {!loadingTaskId && evs && evs.length > 0 && !(evs[0] as any)?.__error && (
                             <div className="grid gap-2">
                               {evs.map((e: any, idx: number) => {
+                                const prev = idx > 0 ? evs[idx - 1] : null;
+                                const delta = diffLabel(prev?.event_time, e?.event_time);
                                 const link = mapsLink(e.lat, e.lon);
+
                                 return (
                                   <div key={idx} className="p-3 rounded-xl border border-zinc-800 bg-zinc-950">
-                                    <div className="flex items-center justify-between">
-                                      <span className={badge(e.event_type)}>{e.event_type}</span>
+                                    <div className="flex items-center justify-between gap-3">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className={badge(e.event_type)}>{e.event_type}</span>
+                                        {delta && (
+                                          <span className="text-xs text-zinc-400">
+                                            {prev?.event_type ? `${prev.event_type} → ${e.event_type} ${delta}` : delta}
+                                          </span>
+                                        )}
+                                      </div>
                                       <span className="text-xs text-zinc-400">{fmtAr(e.event_time)}</span>
                                     </div>
 
@@ -241,7 +272,7 @@ export default function Dashboard() {
         </div>
 
         <div className="mt-3 text-xs text-zinc-500">
-          Tip: click en una fila para desplegar el historial.
+          Tip: click en una fila para desplegar el historial y ver la duración entre estados.
         </div>
       </div>
     </div>
