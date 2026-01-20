@@ -1,26 +1,53 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { getTask, sendEvent, sendEventWithPhoto } from "../api";
+import { getTask, getTaskEvents, sendEvent, sendEventWithPhoto } from "../api";
 import { getGeo } from "../util";
 
 type LastGeo = { lat: number; lon: number; acc?: number | null; time: string; type: string };
+
+function fmtAr(iso: string) {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return String(iso);
+
+  return d.toLocaleString("es-AR", {
+    timeZone: "America/Argentina/Rio_Gallegos",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
 
 export default function TaskDetail() {
   const { taskId } = useParams();
   const cuadrilla = localStorage.getItem("cuadrilla") || "";
   const [task, setTask] = useState<any>(null);
+  const [events, setEvents] = useState<any[]>([]);
   const [msg, setMsg] = useState<string>("");
   const [pauseReason, setPauseReason] = useState<string>("Espera repuesto");
   const [comment, setComment] = useState<string>("");
   const [photo, setPhoto] = useState<File | null>(null);
 
-  // ✅ para mostrar en pantalla la última ubicación registrada desde acá
   const [lastGeo, setLastGeo] = useState<LastGeo | null>(null);
+
+  async function reloadEvents(id: string) {
+    try {
+      const ev = await getTaskEvents(id);
+      setEvents(ev.events || []);
+    } catch {
+      setEvents([]);
+    }
+  }
 
   useEffect(() => {
     (async () => {
-      const t = await getTask(String(taskId));
+      const id = String(taskId);
+      const t = await getTask(id);
       setTask(t);
+      await reloadEvents(id);
     })();
   }, [taskId]);
 
@@ -29,16 +56,14 @@ export default function TaskDetail() {
     try {
       const geo = await getGeo();
 
-      // guardo para mostrarla
       setLastGeo({
         lat: geo.lat,
         lon: geo.lon,
         acc: geo.acc,
         time: new Date().toISOString(),
-        type
+        type,
       });
 
-      // si hay foto, usamos endpoint multipart
       if (photo) {
         const fd = new FormData();
         fd.append("task_id", task.task_id);
@@ -66,10 +91,13 @@ export default function TaskDetail() {
           lon: geo.lon,
           accuracy_m: geo.acc,
           pause_reason: type === "PAUSA" ? pauseReason : null,
-          comment: comment.trim() || null
+          comment: comment.trim() || null,
         });
         setMsg(`✅ ${type} registrado`);
       }
+
+      // ✅ refrescar historial
+      await reloadEvents(String(taskId));
     } catch (e: any) {
       setMsg(`❌ ${e.message}`);
     }
@@ -78,9 +106,7 @@ export default function TaskDetail() {
   if (!task) return <div className="min-h-screen bg-zinc-950 text-zinc-100 p-6">Cargando...</div>;
 
   const bigBtn = "w-full py-5 rounded-2xl font-bold text-xl shadow-lg";
-
-  const mapsUrl =
-    lastGeo ? `https://www.google.com/maps?q=${lastGeo.lat},${lastGeo.lon}` : "";
+  const mapsUrl = lastGeo ? `https://www.google.com/maps?q=${lastGeo.lat},${lastGeo.lon}` : "";
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 p-4">
@@ -94,7 +120,7 @@ export default function TaskDetail() {
           UT: {task.ut} • Contratista: {task.contratista}
         </div>
 
-        {/* ✅ Mostrar coordenadas registradas */}
+        {/* ✅ Última ubicación registrada desde ESTA pantalla */}
         <div className="mt-4 p-4 rounded-2xl bg-zinc-950 border border-zinc-800">
           <div className="font-semibold">📌 Última ubicación registrada</div>
           {lastGeo ? (
@@ -108,10 +134,7 @@ export default function TaskDetail() {
                   {lastGeo.lat.toFixed(6)}, {lastGeo.lon.toFixed(6)}
                 </span>
               </div>
-              <div>
-                Precisión:{" "}
-                {lastGeo.acc != null ? `${Math.round(lastGeo.acc)} m` : "-"}
-              </div>
+              <div>Precisión: {lastGeo.acc != null ? `${Math.round(lastGeo.acc)} m` : "-"}</div>
               <div className="pt-1">
                 <a className="text-brandRed underline" href={mapsUrl} target="_blank" rel="noreferrer">
                   Ver en Google Maps
@@ -168,6 +191,7 @@ export default function TaskDetail() {
             value={comment}
             onChange={(e) => setComment(e.target.value)}
           />
+
           <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4">
             <div className="font-semibold">📷 Foto (opcional)</div>
             <input
@@ -181,6 +205,46 @@ export default function TaskDetail() {
               Si seleccionás foto, el evento se manda con foto automáticamente.
             </div>
           </div>
+        </div>
+
+        {/* ✅ HISTORIAL COMPLETO */}
+        <div className="mt-6 p-4 rounded-2xl bg-zinc-950 border border-zinc-800">
+          <div className="font-semibold">🧾 Historial de la tarea</div>
+          {events.length ? (
+            <div className="mt-3 grid gap-2">
+              {events.map((e, idx) => (
+                <div key={idx} className="p-3 rounded-xl border border-zinc-800 bg-zinc-950">
+                  <div className="flex items-center justify-between">
+                    <div className="font-semibold">{e.event_type}</div>
+                    <div className="text-xs text-zinc-400">{fmtAr(e.event_time)}</div>
+                  </div>
+
+                  {(e.pause_reason || e.comment) && (
+                    <div className="text-sm text-zinc-400 mt-1">
+                      {e.pause_reason ? `Motivo: ${e.pause_reason}` : ""}
+                      {e.pause_reason && e.comment ? " • " : ""}
+                      {e.comment ? `Nota: ${e.comment}` : ""}
+                    </div>
+                  )}
+
+                  {e.lat != null && e.lon != null && (
+                    <div className="text-xs text-zinc-400 mt-1">
+                      <a
+                        className="text-brandRed underline"
+                        href={`https://www.google.com/maps?q=${e.lat},${e.lon}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        ver mapa {e.accuracy_m != null ? `(${Math.round(e.accuracy_m)}m)` : ""}
+                      </a>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-2 text-sm text-zinc-400">Todavía no hay eventos registrados.</div>
+          )}
         </div>
 
         {msg && <div className="mt-5 p-3 rounded-2xl bg-zinc-950 border border-zinc-800">{msg}</div>}
