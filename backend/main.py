@@ -2,6 +2,7 @@ import os
 import uuid
 import hashlib
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.staticfiles import StaticFiles
@@ -10,7 +11,7 @@ import pandas as pd
 from backend.models import CreateEvent
 import backend.local_db as bq
 
-app = FastAPI(title="Seguimiento de CuADRILLAS - Modo Local")
+app = FastAPI(title="Seguimiento de CUADRILLAS - Modo Local")
 
 
 def now_utc():
@@ -34,9 +35,44 @@ def health():
     return {"ok": True}
 
 
+# ----------------------------
+# Uploads: list / disable / enable / delete
+# ----------------------------
+@app.get("/api/uploads")
+def uploads():
+    return {"uploads": bq.list_uploads()}
+
+
+@app.post("/api/uploads/{upload_id}/disable")
+def disable_upload(upload_id: str):
+    ok = bq.set_upload_active(upload_id, False)
+    if not ok:
+        raise HTTPException(404, "No existe upload")
+    return {"ok": True}
+
+
+@app.post("/api/uploads/{upload_id}/enable")
+def enable_upload(upload_id: str):
+    ok = bq.set_upload_active(upload_id, True)
+    if not ok:
+        raise HTTPException(404, "No existe upload")
+    return {"ok": True}
+
+
+@app.delete("/api/uploads/{upload_id}")
+def delete_upload(upload_id: str):
+    deleted = bq.delete_upload(upload_id)
+    if not deleted:
+        raise HTTPException(404, "No existe upload")
+    return {"ok": True, "deleted": deleted}
+
+
+# ----------------------------
+# Import Excel -> tasks + upload registry
+# ----------------------------
 @app.post("/api/upload_tasks")
 async def upload_tasks(files: list[UploadFile] = File(...)):
-    imported = 0
+    imported_total = 0
 
     required_aliases = {
         "Contratista": ["Contratista"],
@@ -48,7 +84,7 @@ async def upload_tasks(files: list[UploadFile] = File(...)):
         "ID Cuadrilla": ["ID Cuadrilla", "Id Cuadrilla"],
     }
 
-    def pick_sheet_and_df(content):
+    def pick_sheet_and_df(content: bytes):
         from io import BytesIO
 
         def norm(s: str) -> str:
@@ -110,7 +146,6 @@ async def upload_tasks(files: list[UploadFile] = File(...)):
 
             out = data[[header_colmap[k] for k in required_aliases.keys()]].copy()
             out.columns = list(required_aliases.keys())
-
             out = out.fillna("").astype(str)
 
             mask_any = (
@@ -128,22 +163,27 @@ async def upload_tasks(files: list[UploadFile] = File(...)):
         return None, None
 
     for f in files:
-        upload_id = uuid.uuid4().hex
-
         content = await f.read()
 
-        # guardar copia del excel para auditoría
-        safe_name = (f.filename or "archivo.xlsx").replace("/", "_").replace("\\", "_")
-        stored_path = os.path.join("local_data", "uploads", f"{upload_id}__{safe_name}")
-        try:
-            with open(stored_path, "wb") as wf:
-                wf.write(content)
-        except Exception:
-            stored_path = ""
+        # 1) Guardar archivo físico
+        upload_id = uuid.uuid4().hex
+        safe_name = (f.filename or "upload.xlsx").replace("/", "_").replace("\\", "_")
+        upload_dir = Path("local_data") / "uploads"
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        saved_path = str(upload_dir / f"{upload_id}__{safe_name}")
 
+        with open(saved_path, "wb") as out:
+            out.write(content)
+
+        # 2) Parsear excel
         sheet, df = pick_sheet_and_df(content)
 
         if df is None:
+            # si falla, borramos el archivo físico guardado
+            try:
+                os.remove(saved_path)
+            except Exception:
+                pass
             raise HTTPException(400, f"No encontré columnas requeridas en {f.filename}")
 
         df = df.fillna("").astype(str)
@@ -151,6 +191,20 @@ async def upload_tasks(files: list[UploadFile] = File(...)):
         df = df[df["Cuadrilla"].str.strip().str.len() > 0]
         df = df[df["ID Cuadrilla"].str.strip().str.len() > 0]
 
+        # 3) Registrar el upload (ACTIVO por defecto)
+        bq.create_upload(
+            {
+                "upload_id": upload_id,
+                "filename": safe_name,
+                "path": saved_path,
+                "sheet": sheet,
+                "rows_imported": int(len(df)),
+                "uploaded_at": now_utc().isoformat(),
+                "active": True,
+            }
+        )
+
+        # 4) Generar tasks con upload_id
         rows = []
         for _, r in df.iterrows():
             task_id, unique_key = make_task_ids(
@@ -166,8 +220,8 @@ async def upload_tasks(files: list[UploadFile] = File(...)):
                 {
                     "task_id": task_id,
                     "unique_key": unique_key,
-                    "upload_id": upload_id,   # ✅ NUEVO
-                    "source_file": f.filename,
+                    "upload_id": upload_id,  # ✅ clave
+                    "source_file": safe_name,
                     "contratista": r["Contratista"],
                     "ot": r["OT"],
                     "ut": r["UT"],
@@ -181,13 +235,9 @@ async def upload_tasks(files: list[UploadFile] = File(...)):
                 }
             )
 
-        inserted = bq.upsert_tasks(rows)
-        imported += inserted
+        imported_total += bq.upsert_tasks(rows)
 
-        # ✅ registrar upload en uploads.json
-        bq.add_upload(upload_id, f.filename, stored_path, inserted)
-
-    return {"imported": imported}
+    return {"imported": imported_total}
 
 
 @app.get("/api/tasks")
@@ -203,7 +253,6 @@ def task(task_id: str):
     return t
 
 
-# ✅ historial de eventos por tarea
 @app.get("/api/task/{task_id}/events")
 def task_events(task_id: str):
     return {"events": bq.list_events_by_task(task_id)}
@@ -243,32 +292,9 @@ def dashboard():
     return {"rows": bq.dashboard_latest()}
 
 
-# ✅ NUEVO: tablero de Excels importados
-@app.get("/api/uploads")
-def uploads():
-    return {"uploads": bq.list_uploads()}
-
-
-@app.post("/api/uploads/{upload_id}/disable")
-def disable_upload(upload_id: str):
-    ok = bq.set_upload_active(upload_id, False)
-    if not ok:
-        raise HTTPException(404, "No existe upload_id")
-    return {"ok": True}
-
-
-@app.post("/api/uploads/{upload_id}/enable")
-def enable_upload(upload_id: str):
-    ok = bq.set_upload_active(upload_id, True)
-    if not ok:
-        raise HTTPException(404, "No existe upload_id")
-    return {"ok": True}
-
-
 # ==========================================================
 # IMPORTANTE:
 # Montar el frontend AL FINAL para no "pisar" /api/*
-# (si lo montás al principio, StaticFiles agarra /api/... y te da 405)
 # ==========================================================
 FRONT_DIST = os.environ.get("FRONT_DIST", "/app/frontend/dist")
 try:
