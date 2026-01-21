@@ -128,7 +128,19 @@ async def upload_tasks(files: list[UploadFile] = File(...)):
         return None, None
 
     for f in files:
+        upload_id = uuid.uuid4().hex
+
         content = await f.read()
+
+        # guardar copia del excel para auditoría
+        safe_name = (f.filename or "archivo.xlsx").replace("/", "_").replace("\\", "_")
+        stored_path = os.path.join("local_data", "uploads", f"{upload_id}__{safe_name}")
+        try:
+            with open(stored_path, "wb") as wf:
+                wf.write(content)
+        except Exception:
+            stored_path = ""
+
         sheet, df = pick_sheet_and_df(content)
 
         if df is None:
@@ -154,6 +166,7 @@ async def upload_tasks(files: list[UploadFile] = File(...)):
                 {
                     "task_id": task_id,
                     "unique_key": unique_key,
+                    "upload_id": upload_id,   # ✅ NUEVO
                     "source_file": f.filename,
                     "contratista": r["Contratista"],
                     "ot": r["OT"],
@@ -168,7 +181,11 @@ async def upload_tasks(files: list[UploadFile] = File(...)):
                 }
             )
 
-        imported += bq.upsert_tasks(rows)
+        inserted = bq.upsert_tasks(rows)
+        imported += inserted
+
+        # ✅ registrar upload en uploads.json
+        bq.add_upload(upload_id, f.filename, stored_path, inserted)
 
     return {"imported": imported}
 
@@ -186,7 +203,7 @@ def task(task_id: str):
     return t
 
 
-# ✅ NUEVO: historial de eventos por tarea
+# ✅ historial de eventos por tarea
 @app.get("/api/task/{task_id}/events")
 def task_events(task_id: str):
     return {"events": bq.list_events_by_task(task_id)}
@@ -224,6 +241,28 @@ async def create_event(payload: CreateEvent):
 @app.get("/api/dashboard")
 def dashboard():
     return {"rows": bq.dashboard_latest()}
+
+
+# ✅ NUEVO: tablero de Excels importados
+@app.get("/api/uploads")
+def uploads():
+    return {"uploads": bq.list_uploads()}
+
+
+@app.post("/api/uploads/{upload_id}/disable")
+def disable_upload(upload_id: str):
+    ok = bq.set_upload_active(upload_id, False)
+    if not ok:
+        raise HTTPException(404, "No existe upload_id")
+    return {"ok": True}
+
+
+@app.post("/api/uploads/{upload_id}/enable")
+def enable_upload(upload_id: str):
+    ok = bq.set_upload_active(upload_id, True)
+    if not ok:
+        raise HTTPException(404, "No existe upload_id")
+    return {"ok": True}
 
 
 # ==========================================================
