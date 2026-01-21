@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { uploadExcels, listUploads, disableUpload, enableUpload } from "../api";
+import { uploadExcels, listUploads, disableUpload, enableUpload, deleteUpload } from "../api";
 
 export default function UploadTasks() {
   const [files, setFiles] = useState<File[]>([]);
@@ -7,10 +7,10 @@ export default function UploadTasks() {
   const [err, setErr] = useState<string>("");
 
   const [uploads, setUploads] = useState<any[]>([]);
-  const [loadingUploads, setLoadingUploads] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  async function refreshUploads() {
-    setLoadingUploads(true);
+  async function refresh() {
+    setLoading(true);
     try {
       const out = await listUploads();
       setUploads(out.uploads || []);
@@ -18,12 +18,12 @@ export default function UploadTasks() {
     } catch (e: any) {
       setErr(e.message);
     } finally {
-      setLoadingUploads(false);
+      setLoading(false);
     }
   }
 
   useEffect(() => {
-    refreshUploads();
+    refresh();
   }, []);
 
   async function onUpload() {
@@ -33,25 +33,41 @@ export default function UploadTasks() {
       const out = await uploadExcels(files);
       setMsg(`✅ Importación OK. Filas procesadas: ${out.imported}`);
       setFiles([]);
-      // refrescar lista abajo
-      await refreshUploads();
+      await refresh();
     } catch (e: any) {
       setErr(e.message);
     }
   }
 
-  async function toggleUpload(u: any) {
+  async function onToggle(u: any) {
     setMsg("");
     setErr("");
     try {
       if (u.active) {
         await disableUpload(u.upload_id);
-        setMsg("✅ Excel dado de baja (ya no lo considera el sistema).");
+        setMsg("✅ Excel dado de baja (no se considera en tareas/tablero).");
       } else {
         await enableUpload(u.upload_id);
-        setMsg("✅ Excel re-activado.");
+        setMsg("✅ Excel reactivado.");
       }
-      await refreshUploads();
+      await refresh();
+    } catch (e: any) {
+      setErr(e.message);
+    }
+  }
+
+  async function onDelete(u: any) {
+    const ok = window.confirm(
+      `⚠️ Eliminar definitivamente:\n\n${u.filename}\n\nEsto borra el Excel, sus tareas y sus eventos.\n¿Confirmás?`
+    );
+    if (!ok) return;
+
+    setMsg("");
+    setErr("");
+    try {
+      await deleteUpload(u.upload_id);
+      setMsg("✅ Eliminado definitivamente.");
+      await refresh();
     } catch (e: any) {
       setErr(e.message);
     }
@@ -60,8 +76,7 @@ export default function UploadTasks() {
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 p-4">
       <div className="max-w-5xl mx-auto space-y-4">
-
-        {/* CARD: Subida */}
+        {/* SUBIR */}
         <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-6">
           <h2 className="text-2xl font-semibold">Subir Excel de Trabajos</h2>
           <p className="text-zinc-300 mt-2">Podés subir <b>más de un Excel</b>.</p>
@@ -90,21 +105,22 @@ export default function UploadTasks() {
           </div>
         </div>
 
-        {/* CARD: Excels cargados */}
+        {/* LISTA EXCELS */}
         <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-6">
           <div className="flex items-end justify-between gap-3">
             <div>
               <h3 className="text-xl font-semibold">Excels cargados</h3>
               <p className="text-zinc-300 text-sm mt-1">
-                Desde acá podés dar de baja / reactivar un Excel.
+                Administrá los Excel: baja lógica o eliminación definitiva.
               </p>
             </div>
+
             <button
               className="px-4 py-2 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-brandRed text-sm"
-              onClick={refreshUploads}
-              disabled={loadingUploads}
+              onClick={refresh}
+              disabled={loading}
             >
-              {loadingUploads ? "Actualizando..." : "Actualizar"}
+              {loading ? "Actualizando..." : "Actualizar"}
             </button>
           </div>
 
@@ -116,7 +132,7 @@ export default function UploadTasks() {
                   <th className="p-3">Archivo</th>
                   <th className="p-3">Filas</th>
                   <th className="p-3">Fecha</th>
-                  <th className="p-3">Acción</th>
+                  <th className="p-3">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -139,12 +155,21 @@ export default function UploadTasks() {
                       {String(u.uploaded_at || "").replace("T", " ").replace("Z", "")}
                     </td>
                     <td className="p-3">
-                      <button
-                        className="px-4 py-2 rounded-xl bg-brandRed hover:opacity-90 font-semibold"
-                        onClick={() => toggleUpload(u)}
-                      >
-                        {u.active ? "Dar de baja" : "Re-activar"}
-                      </button>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          className="px-4 py-2 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-brandRed text-sm font-semibold"
+                          onClick={() => onToggle(u)}
+                        >
+                          {u.active ? "Dar de baja" : "Reactivar"}
+                        </button>
+
+                        <button
+                          className="px-4 py-2 rounded-xl bg-red-700 hover:bg-red-600 text-sm font-semibold"
+                          onClick={() => onDelete(u)}
+                        >
+                          Eliminar definitivamente
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -161,10 +186,9 @@ export default function UploadTasks() {
           </div>
 
           <div className="mt-3 text-xs text-zinc-500">
-            Nota: “Dar de baja” no borra el archivo físico, solo lo deja fuera del sistema.
+            “Dar de baja” = no se usa en tareas/tablero (reversible). “Eliminar” = borra todo (irreversible).
           </div>
         </div>
-
       </div>
     </div>
   );
