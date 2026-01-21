@@ -111,7 +111,7 @@ export default function UploadTasks() {
             <div>
               <h3 className="text-xl font-semibold">Excels cargados</h3>
               <p className="text-zinc-300 text-sm mt-1">
-                Administrá los Excel: baja lógica o eliminación definitiva.
+                Desde acá podés dar de baja / reactivar un Excel o eliminarlo definitivamente.
               </p>
             </div>
 
@@ -132,7 +132,7 @@ export default function UploadTasks() {
                   <th className="p-3">Archivo</th>
                   <th className="p-3">Filas</th>
                   <th className="p-3">Fecha</th>
-                  <th className="p-3">Acciones</th>
+                  <th className="p-3">Acción</th>
                 </tr>
               </thead>
               <tbody>
@@ -149,11 +149,13 @@ export default function UploadTasks() {
                         </span>
                       )}
                     </td>
+
                     <td className="p-3 font-semibold">{u.filename}</td>
                     <td className="p-3 text-zinc-300">{u.rows_imported ?? "-"}</td>
                     <td className="p-3 text-zinc-300">
                       {String(u.uploaded_at || "").replace("T", " ").replace("Z", "")}
                     </td>
+
                     <td className="p-3">
                       <div className="flex flex-wrap gap-2">
                         <button
@@ -186,7 +188,7 @@ export default function UploadTasks() {
           </div>
 
           <div className="mt-3 text-xs text-zinc-500">
-            “Dar de baja” = no se usa en tareas/tablero (reversible). “Eliminar” = borra todo (irreversible).
+            “Dar de baja” = no se usa en tareas/tablero (reversible). “Eliminar definitivamente” = borra todo (irreversible).
           </div>
         </div>
       </div>
