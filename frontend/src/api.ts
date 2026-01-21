@@ -48,7 +48,9 @@ export async function sendEventWithPhoto(form: FormData) {
   return res.json();
 }
 
-// ✅ NUEVO: uploads
+/* =========================
+   Uploads management
+========================= */
 export async function listUploads() {
   const res = await fetch(`${API}/uploads`);
   if (!res.ok) throw new Error(await res.text());
@@ -63,6 +65,12 @@ export async function disableUpload(uploadId: string) {
 
 export async function enableUpload(uploadId: string) {
   const res = await fetch(`${API}/uploads/${encodeURIComponent(uploadId)}/enable`, { method: "POST" });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function deleteUpload(uploadId: string) {
+  const res = await fetch(`${API}/uploads/${encodeURIComponent(uploadId)}`, { method: "DELETE" });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
