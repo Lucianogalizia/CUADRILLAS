@@ -47,3 +47,22 @@ export async function sendEventWithPhoto(form: FormData) {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+// ✅ NUEVO: uploads
+export async function listUploads() {
+  const res = await fetch(`${API}/uploads`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function disableUpload(uploadId: string) {
+  const res = await fetch(`${API}/uploads/${encodeURIComponent(uploadId)}/disable`, { method: "POST" });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function enableUpload(uploadId: string) {
+  const res = await fetch(`${API}/uploads/${encodeURIComponent(uploadId)}/enable`, { method: "POST" });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
